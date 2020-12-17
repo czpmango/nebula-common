@@ -7,14 +7,101 @@
 #include "common/expression/ExprVisitor.h"
 
 namespace nebula {
+
+std::unordered_map<std::string, AggregateExpression::Function> AggregateExpression::nameIdMap_ = {
+    {"", AggregateExpression::Function::kNone},
+    {"COUNT", AggregateExpression::Function::kCount},
+    {"SUM", AggregateExpression::Function::kSum},
+    {"AVG", AggregateExpression::Function::kAvg},
+    {"MAX", AggregateExpression::Function::kMax},
+    {"MIN", AggregateExpression::Function::kMin},
+    {"STD", AggregateExpression::Function::kStdev},
+    {"BIT_AND", AggregateExpression::Function::kBitAnd},
+    {"BIT_OR", AggregateExpression::Function::kBitOr},
+    {"BIT_XOR", AggregateExpression::Function::kBitXor},
+    {"COLLECT", AggregateExpression::Function::kCollect},
+    {"COLLECT_SET", AggregateExpression::Function::kCollectSet}
+};
+
+bool AggregateExpression::operator==(const Expression& rhs) const {
+    if (kind_ != rhs.kind()) {
+        return false;
+    }
+
+    const auto& r = static_cast<const AggregateExpression&>(rhs);
+    return *name_ == *(r.name_) && *arg_ == *(r.arg_);
+}
+
+void AggregateExpression::writeTo(Encoder& encoder) const {
+    // TODO : verify
+    // kind_
+    encoder << kind_;
+
+    // name_
+    encoder << name_.get();
+
+    // distinct_
+    encoder << distinct_;
+
+    // arg_
+    if (arg_) {
+        encoder << *arg_;
+    }
+}
+
+void AggregateExpression::resetFrom(Decoder& decoder) {
+    // TODO : verify
+    // Read name_
+    name_ = decoder.readStr();
+
+    // Read arg_
+    arg_ = decoder.readExpression();
+}
+
+const Value& AggregateExpression::eval(ExpressionContext& ctx) {
+    auto iter = nameIdMap_.find(name_->c_str());
+    if (iter == AggregateExpression::nameIdMap_.end()) {
+        return Value::kNullBadData;
+    }
+
+    auto val = arg_->eval(ctx);
+    auto uniques = result_->uniques();
+    if (distinct_) {
+        if (uniques->contains(val)) {
+            return result_->res();
+        }
+        uniques->values.emplace(val);
+    }
+
+    auto apply = aggFunMap_[iter->second];
+    apply(result_, val);
+
+    return result_->res();
+}
+
+std::string AggregateExpression::toString() const {
+    std::string arg(arg_->toString());
+    std::string isDistinct;
+    if (distinct_) { isDistinct = "distinct";}
+    std::stringstream out;
+    out << *name_ << "(" << isDistinct << " " << arg << ")";
+    return out.str();
+}
+
+void AggregateExpression::accept(ExprVisitor* visitor) {
+    // TODO : impl visitor in nebula-graph
+    // visitor->visit(this);
+    UNUSED(visitor);
+}
+
 std::unordered_map<AggregateExpression::Function,
                    std::function<void(AggData*, const Value&)>>
-                   AggregateExpression::aggFunMap_  = {
+    AggregateExpression::aggFunMap_  = {
     {
-      AggregateExpression::Function::kNone,
-      [](AggData* result, const Value& val) {
-          result->setRes(val);
-      }
+        AggregateExpression::Function::kNone,
+        [](AggData* result, const Value& val) {
+            result->setRes(val);
+        }
     },
     {
         AggregateExpression::Function::kCount,
@@ -280,92 +367,5 @@ std::unordered_map<AggregateExpression::Function,
         }
     }
 };
-
-std::unordered_map<std::string, AggregateExpression::Function> AggregateExpression::nameIdMap_ = {
-    {"", AggregateExpression::Function::kNone},
-    {"COUNT", AggregateExpression::Function::kCount},
-    {"SUM", AggregateExpression::Function::kSum},
-    {"AVG", AggregateExpression::Function::kAvg},
-    {"MAX", AggregateExpression::Function::kMax},
-    {"MIN", AggregateExpression::Function::kMin},
-    {"STD", AggregateExpression::Function::kStdev},
-    {"BIT_AND", AggregateExpression::Function::kBitAnd},
-    {"BIT_OR", AggregateExpression::Function::kBitOr},
-    {"BIT_XOR", AggregateExpression::Function::kBitXor},
-    {"COLLECT", AggregateExpression::Function::kCollect},
-    {"COLLECT_SET", AggregateExpression::Function::kCollectSet}
-};
-
-bool AggregateExpression::operator==(const Expression& rhs) const {
-    if (kind_ != rhs.kind()) {
-        return false;
-    }
-
-    const auto& r = static_cast<const AggregateExpression&>(rhs);
-    return *name_ == *(r.name_) && *arg_ == *(r.arg_);
-}
-
-
-
-void AggregateExpression::writeTo(Encoder& encoder) const {
-    // TODO : verify
-    // kind_
-    encoder << kind_;
-
-    // name_
-    encoder << name_.get();
-
-    // distinct_
-    encoder << distinct_;
-
-    // arg_
-    if (arg_) {
-        encoder << *arg_;
-    }
-}
-
-
-void AggregateExpression::resetFrom(Decoder& decoder) {
-    // TODO : verify
-    // Read name_
-    name_ = decoder.readStr();
-
-    // Read arg_
-    arg_ = decoder.readExpression();
-}
-
-const Value& AggregateExpression::eval(ExpressionContext& ctx) {
-    auto iter = nameIdMap_.find(name_->c_str());
-    if (iter == AggregateExpression::nameIdMap_.end()) {
-        return Value::kNullBadData;
-    }
-
-    auto val = arg_->eval(ctx);
-    auto uniques = result_->uniques();
-    if (distinct_ && uniques->contains(val)) {
-        return result_->res();
-    }
-    uniques->values.emplace(val);
-
-    auto apply = aggFunMap_[iter->second];
-    apply(result_, val);
-
-    return result_->res();
-}
-
-std::string AggregateExpression::toString() const {
-    std::string arg(arg_->toString());
-    std::string isDistinct;
-    if (distinct_) { isDistinct = "distinct";}
-    std::stringstream out;
-    out << *name_ << "(" << isDistinct << " " << arg << ")";
-    return out.str();
-}
-
-void AggregateExpression::accept(ExprVisitor* visitor) {
-    // TODO : impl visitor in nebula-graph
-    // visitor->visit(this);
-    UNUSED(visitor);
-}
 
 }  // namespace nebula
