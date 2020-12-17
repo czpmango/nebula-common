@@ -211,24 +211,22 @@ protected:
         auto func = new std::string(expr);
         FunctionCallExpression* funcExpr = new FunctionCallExpression(func);
         AggregateExpression aggExpr(agg, funcExpr, isDistinct);
-        std::unordered_map<std::string, std::unique_ptr<AggData>> agg_data_map;
+        std::unordered_map<std::string, std::unique_ptr<AggFun>> fun;
         for (auto row : inputVar) {
-            auto iter = agg_data_map.find(row.first);
-            if (iter == agg_data_map.end()) {
-                agg_data_map[row.first] = std::make_unique<AggData>();
+            auto iter = fun.find(row.first);
+            if (iter == fun.end()) {
+                auto fun = AggFun::aggFunMap_[AggFun::nameIdMap_[*agg]](isDistinct);
+                fun[row.first] = std::move(fun);
             }
             auto args = std::make_unique<ArgumentList>(1);
             args->addArgument(std::make_unique<ConstantExpression>(row.second));
             funcExpr->setArgs(std::move(args).release());
-            aggExpr.setAggData(agg_data_map[row.first].get());
-            auto eval = aggExpr.eval(gExpCtxt);
-            if (eval.isBadNull()) {
-                assert(false);
-            }
+            aggExpr.setAggFun(fun[row.first].get());
+            aggExpr.eval(gExpCtxt);
         }
         std::unordered_map<std::string, Value> res;
-        for (auto& iter : agg_data_map) {
-            res[iter.first] = iter.second->res();
+        for (auto& iter : fun) {
+            res[iter.first] = iter.second->getResult();
         }
         EXPECT_EQ(res, expected);
     }
