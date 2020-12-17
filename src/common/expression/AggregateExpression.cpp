@@ -338,9 +338,8 @@ std::unordered_map<AggregateExpression::Function,
                 res = Value::kNullBadData;
                 return;
             }
-            auto list = res.getList();
+            auto &list = res.mutableList();
             list.emplace_back(val);
-            result->setRes(list);
         }
     },
     {
@@ -361,9 +360,8 @@ std::unordered_map<AggregateExpression::Function,
                 res = Value::kNullBadData;
                 return;
             }
-            auto set = res.getSet();
+            auto& set = res.mutableSet();
             set.values.emplace(val);
-            result->setRes(set);
         }
     }
 };
