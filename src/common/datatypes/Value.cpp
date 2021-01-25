@@ -1627,6 +1627,175 @@ std::pair<int64_t, bool> Value::toInt() {
     }
 }
 
+Value Value::lessThan(const Value& v) const {
+   auto vType = v.type();
+    auto hasNullOrEmpty = (type_ | vType) & Value::kEmptyNullType;
+    auto notSameType = type_ != vType;
+    auto notBothNumeric = ((type_ | vType) & Value::kNumericType) != Value::kNumericType;
+    if (hasNullOrEmpty || (notSameType && notBothNumeric)) {
+        return Value::kNullValue;
+    }
+
+    switch (type_) {
+        case Value::Type::BOOL: {
+            return getBool() < v.getBool();
+        }
+        case Value::Type::INT: {
+            switch (vType) {
+                case Value::Type::INT: {
+                    return getInt() < v.getInt();
+                }
+                case Value::Type::FLOAT: {
+                    return (std::abs(getInt() - v.getFloat()) > kEpsilon
+                            && getInt() < v.getFloat());
+                }
+                default: {
+                    return false;
+                }
+            }
+        }
+        case Value::Type::FLOAT: {
+            switch (vType) {
+                case Value::Type::INT: {
+                    return (std::abs(getFloat() - v.getInt()) > kEpsilon
+                            && getFloat() < v.getInt());
+                }
+                case Value::Type::FLOAT: {
+                    return (std::abs(getFloat() - v.getFloat()) > kEpsilon
+                            && getFloat() < v.getFloat());
+                }
+                default: {
+                    return false;
+                }
+            }
+        }
+        case Value::Type::STRING: {
+            return getStr() < v.getStr();
+        }
+        case Value::Type::DATE: {
+            return getDate() < v.getDate();
+        }
+        case Value::Type::TIME: {
+            // TODO(shylock) convert to UTC then compare
+            return getTime() < v.getTime();
+        }
+        case Value::Type::DATETIME: {
+            // TODO(shylock) convert to UTC then compare
+            return getDateTime() < v.getDateTime();
+        }
+        case Value::Type::VERTEX: {
+            return getVertex() < v.getVertex();
+        }
+        case Value::Type::EDGE: {
+            return getEdge() < v.getEdge();
+        }
+        case Value::Type::PATH: {
+            return getPath() < v.getPath();
+        }
+        case Value::Type::LIST: {
+            return getList() < v.getList();
+        }
+        case Value::Type::MAP: {
+            return getMap() < v.getMap();
+        }
+        case Value::Type::SET: {
+            return getSet() < v.getSet();
+        }
+        case Value::Type::DATASET: {
+            return getDataSet() < v.getDataSet();
+        }
+        case Value::Type::NULLVALUE:
+        case Value::Type::__EMPTY__: {
+            return false;
+        }
+    }
+    DLOG(FATAL) << "Unknown type " << static_cast<int>(v.type());
+    return Value::kNullValue;
+}
+
+Value Value::equal(const Value& v) const {
+    auto vType = v.type();
+    auto hasNullOrEmpty = (type_ | vType) & Value::kEmptyNullType;
+    auto notSameType = type_ != vType;
+    auto notBothNumeric = ((type_ | vType) & Value::kNumericType) != Value::kNumericType;
+    if (hasNullOrEmpty || (notSameType && notBothNumeric)) {
+        return Value::kNullValue;
+    }
+
+    switch (type_) {
+        case Value::Type::BOOL: {
+            return getBool() == v.getBool();
+        }
+        case Value::Type::INT: {
+            switch (vType) {
+                case Value::Type::INT: {
+                    return getInt() == v.getInt();
+                }
+                case Value::Type::FLOAT: {
+                    return std::abs(getInt() - v.getFloat()) < kEpsilon;
+                }
+                default: {
+                    return false;
+                }
+            }
+        }
+        case Value::Type::FLOAT: {
+            switch (vType) {
+                case Value::Type::INT: {
+                    return std::abs(getFloat() - v.getInt()) < kEpsilon;
+                }
+                case Value::Type::FLOAT: {
+                    return std::abs(getFloat() - v.getFloat()) < kEpsilon;
+                }
+                default: {
+                    return false;
+                }
+            }
+        }
+        case Value::Type::STRING: {
+            return getStr() == v.getStr();
+        }
+        case Value::Type::DATE: {
+            return getDate() == v.getDate();
+        }
+        case Value::Type::TIME: {
+            // TODO(shylock) convert to UTC then compare
+            return getTime() == v.getTime();
+        }
+        case Value::Type::DATETIME: {
+            // TODO(shylock) convert to UTC then compare
+            return getDateTime() == v.getDateTime();
+        }
+        case Value::Type::VERTEX: {
+            return getVertex() == v.getVertex();
+        }
+        case Value::Type::EDGE: {
+            return getEdge() == v.getEdge();
+        }
+        case Value::Type::PATH: {
+            return getPath() == v.getPath();
+        }
+        case Value::Type::LIST: {
+            return getList() == v.getList();
+        }
+        case Value::Type::MAP: {
+            return getMap() == v.getMap();
+        }
+        case Value::Type::SET: {
+            return getSet() == v.getSet();
+        }
+        case Value::Type::DATASET: {
+            return getDataSet() == v.getDataSet();
+        }
+        case Value::Type::NULLVALUE:
+        case Value::Type::__EMPTY__: {
+            return false;
+        }
+    }
+    DLOG(FATAL) << "Unknown type " << static_cast<int>(v.type());
+    return Value::kNullValue;
+}
+
 void swap(Value& a, Value& b) {
     Value temp(std::move(a));
     a = std::move(b);
@@ -2226,164 +2395,21 @@ Value operator!(const Value& rhs) {
 }
 
 bool operator<(const Value& lhs, const Value& rhs) {
-    auto lType = lhs.type();
-    auto rType = rhs.type();
-    auto hasNullOrEmpty = (lType | rType) & Value::kEmptyNullType;
-    auto notSameType = lType != rType;
-    auto notBothNumeric = ((lType | rType) & Value::kNumericType) != Value::kNumericType;
-    if (hasNullOrEmpty || (notSameType && notBothNumeric)) {
-        return lType < rType;
-    }
-
-    switch (lType) {
-        case Value::Type::BOOL: {
-            return lhs.getBool() < rhs.getBool();
-        }
-        case Value::Type::INT: {
-            switch (rType) {
-                case Value::Type::INT: {
-                    return lhs.getInt() < rhs.getInt();
-                }
-                case Value::Type::FLOAT: {
-                    return lhs.getInt() < rhs.getFloat();
-                }
-                default: {
-                    return false;
-                }
-            }
-        }
-        case Value::Type::FLOAT: {
-            switch (rType) {
-                case Value::Type::INT: {
-                    return lhs.getFloat() < rhs.getInt();
-                }
-                case Value::Type::FLOAT: {
-                    return lhs.getFloat() < rhs.getFloat();
-                }
-                default: {
-                    return false;
-                }
-            }
-        }
-        case Value::Type::STRING: {
-            return lhs.getStr() < rhs.getStr();
-        }
-        case Value::Type::VERTEX: {
-            return lhs.getVertex() < rhs.getVertex();
-        }
-        case Value::Type::EDGE: {
-            return lhs.getEdge() < rhs.getEdge();
-        }
-        case Value::Type::PATH: {
-            return lhs.getPath() < rhs.getPath();
-        }
-        case Value::Type::TIME: {
-            return lhs.getTime() < rhs.getTime();
-        }
-        case Value::Type::DATE: {
-            return lhs.getDate() < rhs.getDate();
-        }
-        case Value::Type::DATETIME: {
-            return lhs.getDateTime() < rhs.getDateTime();
-        }
-        case Value::Type::LIST:
-        case Value::Type::MAP:
-        case Value::Type::SET:
-        case Value::Type::DATASET: {
-            // TODO:
-            return false;
-        }
-        case Value::Type::NULLVALUE:
-        case Value::Type::__EMPTY__: {
-            return false;
-        }
-    }
-    DLOG(FATAL) << "Unknown type " << static_cast<int>(lType);
-    return false;
+     auto res = lhs.lessThan(rhs);
+     if (res.isBool()) {
+         return res.getBool();
+     } else {
+         return false;
+     }
 }
 
 bool operator==(const Value& lhs, const Value& rhs) {
-    auto lType = lhs.type();
-    auto rType = rhs.type();
-    auto hasNullOrEmpty = (lType | rType) & Value::kEmptyNullType;
-    auto notSameType = lType != rType;
-    auto notBothNumeric = ((lType | rType) & Value::kNumericType) != Value::kNumericType;
-    if (hasNullOrEmpty || (notSameType && notBothNumeric)) {
-        return lhs.type() == rhs.type();
-    }
-
-    switch (lType) {
-        case Value::Type::BOOL: {
-            return lhs.getBool() == rhs.getBool();
-        }
-        case Value::Type::INT: {
-            switch (rType) {
-                case Value::Type::INT: {
-                    return lhs.getInt() == rhs.getInt();
-                }
-                case Value::Type::FLOAT: {
-                    return std::abs(lhs.getInt() - rhs.getFloat()) < kEpsilon;
-                }
-                default: {
-                    return false;
-                }
-            }
-        }
-        case Value::Type::FLOAT: {
-            switch (rType) {
-                case Value::Type::INT: {
-                    return std::abs(lhs.getFloat() - rhs.getInt()) < kEpsilon;
-                }
-                case Value::Type::FLOAT: {
-                    return std::abs(lhs.getFloat() - rhs.getFloat()) < kEpsilon;
-                }
-                default: {
-                    return false;
-                }
-            }
-        }
-        case Value::Type::STRING: {
-            return lhs.getStr() == rhs.getStr();
-        }
-        case Value::Type::DATE: {
-            return lhs.getDate() == rhs.getDate();
-        }
-        case Value::Type::TIME: {
-            // TODO(shylock) convert to UTC then compare
-            return lhs.getTime() == rhs.getTime();
-        }
-        case Value::Type::DATETIME: {
-            // TODO(shylock) convert to UTC then compare
-            return lhs.getDateTime() == rhs.getDateTime();
-        }
-        case Value::Type::VERTEX: {
-            return lhs.getVertex() == rhs.getVertex();
-        }
-        case Value::Type::EDGE: {
-            return lhs.getEdge() == rhs.getEdge();
-        }
-        case Value::Type::PATH: {
-            return lhs.getPath() == rhs.getPath();
-        }
-        case Value::Type::LIST: {
-            return lhs.getList() == rhs.getList();
-        }
-        case Value::Type::MAP: {
-            return lhs.getMap() == rhs.getMap();
-        }
-        case Value::Type::SET: {
-            return lhs.getSet() == rhs.getSet();
-        }
-        case Value::Type::DATASET: {
-            return lhs.getDataSet() == rhs.getDataSet();
-        }
-        case Value::Type::NULLVALUE:
-        case Value::Type::__EMPTY__: {
-            return false;
-        }
-    }
-    DLOG(FATAL) << "Unknown type " << static_cast<int>(lhs.type());
-    return false;
+    auto res = lhs.equal(rhs);
+     if (res.isBool()) {
+         return res.getBool();
+     } else {
+         return false;
+     }
 }
 
 bool operator!=(const Value& lhs, const Value& rhs) {

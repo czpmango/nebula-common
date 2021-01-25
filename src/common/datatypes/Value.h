@@ -312,6 +312,10 @@ struct Value {
 
     std::pair<int64_t, bool> toInt();
 
+    Value lessThan(const Value& v) const;
+
+    Value equal(const Value& v) const;
+
 private:
     Type type_;
 

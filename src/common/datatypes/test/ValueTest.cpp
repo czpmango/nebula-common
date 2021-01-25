@@ -247,7 +247,7 @@ TEST(Value, Comparison) {
     {
         Value v = vNull == vNull;
         EXPECT_EQ(Value::Type::BOOL, v.type());
-        EXPECT_EQ(true, v.getBool());
+        EXPECT_EQ(false, v.getBool());
 
         v = vInt1 == vNull;
         EXPECT_EQ(Value::Type::BOOL, v.type());
@@ -255,7 +255,7 @@ TEST(Value, Comparison) {
 
         v = Value() == vEmpty;
         EXPECT_EQ(Value::Type::BOOL, v.type());
-        EXPECT_EQ(true, v.getBool());
+        EXPECT_EQ(false, v.getBool());
 
         v = vInt1 == vEmpty;
         EXPECT_EQ(Value::Type::BOOL, v.type());
@@ -267,7 +267,7 @@ TEST(Value, Comparison) {
 
         v = vInt1 < vNull;
         EXPECT_EQ(Value::Type::BOOL, v.type());
-        EXPECT_EQ(true, v.getBool());
+        EXPECT_EQ(false, v.getBool());
 
         v = vInt1 > vNull;
         EXPECT_EQ(Value::Type::BOOL, v.type());
@@ -283,7 +283,7 @@ TEST(Value, Comparison) {
 
         v = vInt1 > vEmpty;
         EXPECT_EQ(Value::Type::BOOL, v.type());
-        EXPECT_EQ(true, v.getBool());
+        EXPECT_EQ(false, v.getBool());
     }
 
     // int
@@ -785,13 +785,13 @@ TEST(Value, DecodeEncode) {
         // vertex
         Value(Vertex({"Vid", {
             Tag("tagName", {{"prop", Value(2)}}),
-            Tag("tagName1", {{"prop1", Value(2)}, {"prop2", Value(NullType::__NULL__)}}),
+            Tag("tagName1", {{"prop1", Value(2)}, {"prop2", Value("3")}}),
         }})),
 
         // integerID vertex
         Value(Vertex({001, {
             Tag("tagName", {{"prop", Value(2)}}),
-            Tag("tagName1", {{"prop1", Value(2)}, {"prop2", Value(NullType::__NULL__)}}),
+            Tag("tagName1", {{"prop1", Value(2)}, {"prop2", Value("3")}}),
         }})),
 
         // edge
@@ -801,7 +801,9 @@ TEST(Value, DecodeEncode) {
         Value(Edge(001, 002, 1, "Edge", 233, {{"prop1", Value(233)}, {"prop2", Value(2.3)}})),
 
         // Path
-        Value(Path()),
+        Value(Path(
+            Vertex({"1", {Tag("tagName", {{"prop", Value(2)}})}}),
+            {Step(Vertex({"1", {Tag("tagName", {{"prop", Value(2)}})}}), 1, "1", 1, {{"1", 1}})})),
 
         // List
         Value(List({Value(2), Value(true), Value(2.33)})),
@@ -822,6 +824,14 @@ TEST(Value, DecodeEncode) {
         Value valCopy;
         std::size_t s = serializer::deserialize(buf, valCopy);
         ASSERT_EQ(s, buf.size());
+        if (val.isNull()) {
+            EXPECT_EQ(val.getNull(), valCopy.getNull());
+            continue;
+        }
+        if (val.empty()) {
+            EXPECT_EQ(valCopy.empty(), true);
+            continue;
+        }
         EXPECT_EQ(val, valCopy);
     }
 }
